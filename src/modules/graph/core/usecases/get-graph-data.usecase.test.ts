@@ -1,7 +1,7 @@
 import { AppState } from "@root/modules/store/app-state";
 import { AppDispatch, AppStore } from "@root/modules/store/store";
 import { createTestStore } from "@root/modules/testing/tests-environment";
-import { getGraphDataUsecase } from "./get-graph-data.usecase";
+import { getGraphData } from "./get-graph-data.usecase";
 
 describe("Get Graph Data Usecase", () => {
   let store: AppStore;
@@ -30,7 +30,7 @@ describe("Get Graph Data Usecase", () => {
   });
 
   it("should get the graph data", async () => {
-    await dispatch(getGraphDataUsecase());
+    await dispatch(getGraphData());
 
     appState = store.getState();
 
@@ -61,7 +61,7 @@ describe("Get Graph Data Usecase", () => {
 
     expect(appState.graph.loading).toBe(false);
 
-    const promise = dispatch(getGraphDataUsecase());
+    const promise = dispatch(getGraphData());
 
     appState = store.getState();
 

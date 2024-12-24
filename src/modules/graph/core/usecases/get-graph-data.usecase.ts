@@ -1,6 +1,6 @@
 import { createAppAsyncThunk } from "@root/modules/store/create-app-async-thunk";
 
-export const getGraphDataUsecase = createAppAsyncThunk(
+export const getGraphData = createAppAsyncThunk(
   "graphData/getGraphData",
   async (_, { extra }) => {
     const { graphDataGateway } = extra;

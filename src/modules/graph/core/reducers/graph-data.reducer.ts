@@ -1,6 +1,6 @@
 import { createReducer } from "@reduxjs/toolkit";
 import { AppState } from "@root/modules/store/app-state";
-import { getGraphDataUsecase } from "../usecases/get-graph-data.usecase";
+import { getGraphData } from "../usecases/get-graph-data.usecase";
 
 export const graphDataReducer = createReducer<AppState["graph"]>(
   {
@@ -11,12 +11,12 @@ export const graphDataReducer = createReducer<AppState["graph"]>(
     loading: false,
   },
   (builder) => {
-    builder.addCase(getGraphDataUsecase.fulfilled, (state, action) => {
+    builder.addCase(getGraphData.fulfilled, (state, action) => {
       state.data.nodes = action.payload.nodes;
       state.data.links = action.payload.links;
       state.loading = false;
     });
-    builder.addCase(getGraphDataUsecase.pending, (state) => {
+    builder.addCase(getGraphData.pending, (state) => {
       state.loading = true;
     });
   }
