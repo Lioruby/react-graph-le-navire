@@ -8,6 +8,7 @@ export class HttpGraphDataGateway implements IGraphDataGateway {
   async getData(): Promise<GraphDomainModel.GraphData> {
     const response =
       await this.httpClient.get<GraphDomainModel.GraphData>("/graph");
+    console.log(response.data);
     return response.data;
   }
 }

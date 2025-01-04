@@ -3,8 +3,7 @@ import ForceGraph2D, {
   LinkObject,
 } from "react-force-graph-2d";
 import { useGraphScreen } from "./use-graph-screen.hook";
-import * as d3 from "d3";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface GraphNode {
   id: string;
@@ -13,6 +12,8 @@ interface GraphNode {
   degree: number;
   x?: number;
   y?: number;
+  profilePictureUrl: string | null;
+  trustScore: number;
 }
 
 export default function GraphScreen(): JSX.Element {
@@ -20,14 +21,39 @@ export default function GraphScreen(): JSX.Element {
 
   const fg = useRef<ForceGraphMethods<GraphNode, LinkObject>>();
 
-  const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+
+  // Ajouter un cache d'images avec useRef
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  // Fonction pour précharger les images
+  useEffect(() => {
+    if (!graphData) return;
+
+    graphData.nodes.forEach((node: GraphNode) => {
+      if (
+        node.profilePictureUrl &&
+        !imageCache.current.has(node.profilePictureUrl)
+      ) {
+        const img = new Image();
+        img.src = node.profilePictureUrl;
+        img.onload = () => {
+          imageCache.current.set(node.profilePictureUrl!, img);
+        };
+      }
+    });
+  }, [graphData]);
 
   useEffect(() => {
     if (fg.current && graphData) {
       fg.current.d3Force("link")?.distance((link: LinkObject) => {
         const source = link.source as GraphNode;
         const target = link.target as GraphNode;
-        return source.community === target.community ? 30 : 80;
+        return source.community === target.community ? 2000 : 1500;
+      });
+
+      fg.current.d3Force("charge")?.strength((node: GraphNode) => {
+        return node.community === selectedNode?.community ? 1000 : 0;
       });
 
       fg.current.d3ReheatSimulation();
@@ -48,29 +74,98 @@ export default function GraphScreen(): JSX.Element {
         ref={fg}
         graphData={graphData}
         backgroundColor="#000"
-        nodeColor={(node) =>
-          colorScale(String((node as unknown as GraphNode).community))
-        }
         cooldownTicks={300}
-        nodeVal={(node) => 0.2 + (node as GraphNode).degree * 0.1}
+        nodeVal={(node) => 10 + (node as GraphNode).trustScore * 0.5}
         nodeCanvasObjectMode={() => "after"}
-        nodeCanvasObject={(node, ctx, globalScale) => {
+        nodeCanvasObject={(node, ctx) => {
           const n = node as GraphNode;
-          const label = (n.id || "").slice(0, 2).toUpperCase();
+          const nodeSize = n.trustScore * 0.5;
 
-          const fontSize = 20 / globalScale;
-          ctx.font = `${fontSize}px Arial`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillStyle = "white";
+          const isConnected =
+            selectedNode &&
+            graphData?.links.some(
+              (link) =>
+                ((link.source as unknown as GraphNode).id === selectedNode.id &&
+                  (link.target as unknown as GraphNode).id === n.id) ||
+                ((link.target as unknown as GraphNode).id === selectedNode.id &&
+                  (link.source as unknown as GraphNode).id === n.id)
+            );
 
-          ctx.fillText(label, n.x || 0, n.y || 0);
+          // Utiliser l'image en cache si disponible
+          if (
+            n.profilePictureUrl &&
+            imageCache.current.has(n.profilePictureUrl)
+          ) {
+            const img = imageCache.current.get(n.profilePictureUrl)!;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(n.x || 0, n.y || 0, nodeSize, 0, 2 * Math.PI);
+            ctx.clip();
+
+            const imgAspectRatio = img.width / img.height;
+            const nodeAspectRatio = 1;
+
+            let drawWidth = nodeSize * 2;
+            let drawHeight = nodeSize * 2;
+
+            if (imgAspectRatio > nodeAspectRatio) {
+              drawWidth = (nodeSize * 2 * imgAspectRatio) / nodeAspectRatio;
+              drawHeight = nodeSize * 2;
+            } else {
+              drawWidth = nodeSize * 2;
+              drawHeight = (nodeSize * 2 * nodeAspectRatio) / imgAspectRatio;
+            }
+
+            const drawX = (n.x || 0) - drawWidth / 2;
+            const drawY = (n.y || 0) - drawHeight / 2;
+
+            ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+            ctx.restore();
+          } else {
+            // Fallback si l'image n'est pas encore chargée
+            ctx.beginPath();
+            ctx.arc(n.x || 0, n.y || 0, nodeSize, 0, 2 * Math.PI);
+            ctx.fillStyle = "#001A6E";
+            ctx.fill();
+          }
+
+          // Ajouter un contour jaune pour le nœud sélectionné et les nœuds connectés
+          if (selectedNode?.id === n.id || isConnected) {
+            ctx.beginPath();
+            ctx.arc(n.x || 0, n.y || 0, nodeSize, 0, 2 * Math.PI);
+            ctx.strokeStyle = "#FFC145";
+            ctx.lineWidth = 4;
+            ctx.stroke();
+          }
         }}
-        nodeLabel={(node) => (node as GraphNode).name || (node as GraphNode).id}
+        onNodeClick={(node) => {
+          const graphNode = node as GraphNode;
+          setSelectedNode(selectedNode?.id === graphNode.id ? null : graphNode);
+        }}
+        nodeLabel={(node) => (node as GraphNode).id}
         nodeRelSize={5}
-        linkColor={() => "rgba(255, 255, 255, 0.3)"}
-        linkWidth={1}
+        linkColor={(link) => {
+          const source = link.source as GraphNode;
+          const target = link.target as GraphNode;
+          return selectedNode &&
+            (source.id === selectedNode.id || target.id === selectedNode.id)
+            ? "#FFC145"
+            : "rgba(255, 255, 255, 0.3)";
+        }}
+        linkWidth={() => 1}
         linkDirectionalArrowColor={() => "#fff"}
+        linkDirectionalParticles={(link) => {
+          const source = link.source as GraphNode;
+          const target = link.target as GraphNode;
+          return selectedNode &&
+            (source.id === selectedNode.id || target.id === selectedNode.id)
+            ? 4
+            : 0;
+        }}
+        linkDirectionalParticleWidth={3}
+        linkDirectionalParticleSpeed={0.005}
+        linkDirectionalParticleColor={() => "white"}
       />
     </div>
   );
