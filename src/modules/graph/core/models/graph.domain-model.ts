@@ -4,6 +4,10 @@ export namespace GraphDomainModel {
     name: string;
     profilePictureUrl: string | null;
     trustScore: number;
+    coordinates: {
+      x: number;
+      y: number;
+    };
   };
 
   export type Link = {

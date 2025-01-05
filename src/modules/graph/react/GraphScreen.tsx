@@ -8,8 +8,6 @@ import { useEffect, useRef, useState } from "react";
 interface GraphNode {
   id: string;
   name: string;
-  community: number;
-  degree: number;
   x?: number;
   y?: number;
   profilePictureUrl: string | null;
@@ -23,10 +21,22 @@ export default function GraphScreen(): JSX.Element {
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
-  // Ajouter un cache d'images avec useRef
+  const initialPositions = useRef<Map<string, { x: number; y: number }>>(
+    new Map()
+  );
+
+  useEffect(() => {
+    if (graphData) {
+      graphData.nodes.forEach((node: GraphNode) => {
+        if (node.x !== undefined && node.y !== undefined) {
+          initialPositions.current.set(node.id, { x: node.x, y: node.y });
+        }
+      });
+    }
+  }, [graphData]);
+
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Fonction pour précharger les images
   useEffect(() => {
     if (!graphData) return;
 
@@ -46,14 +56,12 @@ export default function GraphScreen(): JSX.Element {
 
   useEffect(() => {
     if (fg.current && graphData) {
-      fg.current.d3Force("link")?.distance((link: LinkObject) => {
-        const source = link.source as GraphNode;
-        const target = link.target as GraphNode;
-        return source.community === target.community ? 2000 : 1500;
+      fg.current.d3Force("link")?.distance(() => {
+        return 1000;
       });
 
-      fg.current.d3Force("charge")?.strength((node: GraphNode) => {
-        return node.community === selectedNode?.community ? 1000 : 0;
+      fg.current.d3Force("charge")?.strength(() => {
+        return -1000;
       });
 
       fg.current.d3ReheatSimulation();
@@ -74,9 +82,13 @@ export default function GraphScreen(): JSX.Element {
         ref={fg}
         graphData={graphData}
         backgroundColor="#000"
-        cooldownTicks={300}
-        nodeVal={(node) => 10 + (node as GraphNode).trustScore * 0.5}
+        cooldownTicks={200}
+        enableNodeDrag={true}
         nodeCanvasObjectMode={() => "after"}
+        nodeVal={(node) => {
+          const n = node as GraphNode;
+          return n.trustScore * 0.5;
+        }}
         nodeCanvasObject={(node, ctx) => {
           const n = node as GraphNode;
           const nodeSize = n.trustScore * 0.5;
@@ -166,7 +178,30 @@ export default function GraphScreen(): JSX.Element {
         linkDirectionalParticleWidth={3}
         linkDirectionalParticleSpeed={0.005}
         linkDirectionalParticleColor={() => "white"}
+        // onNodeDragEnd={(node) => {
+        //   // Mettre à jour les coordonnées du nœud après le drag
+        //   const n = node as GraphNode;
+        //   n.x = n.x;
+        //   n.y = n.y;
+        // }}
       />
+      <button
+        className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded border border-white"
+        onClick={() => {
+          if (graphData && fg.current) {
+            graphData.nodes.forEach((node: GraphNode) => {
+              const initialPos = initialPositions.current.get(node.id);
+              if (initialPos) {
+                node.x = initialPos.x;
+                node.y = initialPos.y;
+              }
+            });
+            fg.current.d3ReheatSimulation();
+          }
+        }}
+      >
+        Réinitialiser les positions
+      </button>
     </div>
   );
 }
